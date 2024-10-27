@@ -18,7 +18,9 @@ import random
 from collections import deque
 from dataclasses import dataclass
 from subprocess import SubprocessError
-from typing import Any, Deque, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Deque, Dict, Iterator, List, Optional, Tuple, Union, ClassVar
+from IPython.display import display, clear_output, SVG
+import time
 
 from graphviz import Digraph, nohtml
 
@@ -111,6 +113,9 @@ class Node:
     :raise binarytree.exceptions.NodeValueError: If node value is invalid.
     """
 
+    current_node: ClassVar[Optional["Node"]] = None
+    draw_root: ClassVar[Optional["Node"]] = None
+
     def __init__(
         self,
         value: NodeValue,
@@ -120,6 +125,88 @@ class Node:
         self.value = self.val = value
         self.left = left
         self.right = right
+        self.current = False
+        self.visited = False
+        self.queued = False
+
+    def _animate(self, delay: float = 0.5) -> None:
+        """Animate the binary tree using Jupyter notebook.
+
+        :param delay: Delay between frames in seconds (default: 0.5).
+        :type delay: float
+        """
+        if Node.draw_root is None:
+            Node.draw_root = self
+        display(SVG(Node.draw_root._repr_svg_()))
+        clear_output(wait=True)
+        time.sleep(delay)
+
+    def mark_current(self) -> None:
+        """Mark the current node.
+
+        This method sets the current node flag to True, and queued flag to False.
+
+        **Example**:
+
+        .. doctest::
+
+            >>> from binarytree import Node
+            >>>
+            >>> root = Node(1)
+            >>> root.mark_current()
+            >>> root.current
+            True
+            >>> root.queued
+            False
+        """
+        if Node.current_node is not None:
+            Node.current_node.current = False
+            Node.current_node.visited = True
+        Node.current_node = self
+        self.current = True
+        self.queued = False
+        self._animate()
+
+    def mark_visited(self) -> None:
+        """Mark the node as visited.
+
+        This method sets the visited flag to True, and queued flag to False.
+
+        **Example**:
+
+        .. doctest::
+
+            >>> from binarytree import Node
+            >>>
+            >>> root = Node(1)
+            >>> root.mark_visited()
+            >>> root.visited
+            True
+            >>> root.queued
+            False
+        """
+        self.visited = True
+        self.queued = False
+        self._animate()
+
+    def mark_queued(self) -> None:
+        """Mark the node as queued.
+
+        This method sets the queued flag to True.
+
+        **Example**:
+
+        .. doctest::
+
+            >>> from binarytree import Node
+            >>>
+            >>> root = Node(1)
+            >>> root.mark_queued()
+            >>> root.queued
+            True
+        """
+        self.queued = True
+        self._animate()
 
     def __repr__(self) -> str:
         """Return the string representation of the current node.
@@ -620,8 +707,15 @@ class Node:
 
         for node in self:
             node_id = str(id(node))
+            node_color = kwargs["node_attr"]["fillcolor"]
+            if node.queued:
+                node_color = "yellow"
+            if node.visited:
+                node_color = "darkgray"
+            if node.current:
+                node_color = "blue"
 
-            digraph.node(node_id, nohtml(f"<l>|<v> {node.value}|<r>"))
+            digraph.node(node_id, nohtml(f"<l>|<v> {node.value}|<r>"), color=node_color)
 
             if node.left is not None:
                 digraph.edge(f"{node_id}:l", f"{id(node.left)}:v")
